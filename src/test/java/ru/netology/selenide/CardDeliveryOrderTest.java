@@ -1,21 +1,18 @@
 package ru.netology.selenide;
 
+import com.codeborne.selenide.Condition;
 import com.codeborne.selenide.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.Keys;
 
 import java.sql.Timestamp;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.Date;
+import java.time.format.DateTimeFormatter;
 
-import static com.codeborne.selenide.Condition.text;
-import static com.codeborne.selenide.Condition.visible;
 import static com.codeborne.selenide.Selectors.withText;
 import static com.codeborne.selenide.Selenide.$;
 import static com.codeborne.selenide.Selenide.open;
@@ -27,17 +24,15 @@ public class CardDeliveryOrderTest {
         open("http://localhost:9999");
     }
 
+    public String generateDate(int days) {
+        return LocalDate.now().plusDays(days).format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+    }
+
     @Test
     void shouldSubmitForm() {
         Configuration.holdBrowserOpen = true;
+        String date = generateDate(4);
         $("[data-test-id=city] input").setValue("Челябинск");
-
-        //Создаем строку с датой + 4 дня от текущего
-        LocalDateTime localDateTime = (new Date()).toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
-        localDateTime = localDateTime.plusDays(4);
-        Date currentDatePlusFourDays = Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant());
-        DateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy");
-        String date = dateFormat.format(currentDatePlusFourDays);
 
         //Очищаем ячейку с датой, после чего заполняем её
         $("[data-test-id=date] input").doubleClick();
@@ -48,32 +43,40 @@ public class CardDeliveryOrderTest {
         $("[data-test-id=phone] input").setValue("+79220450812");
         $("[data-test-id=agreement]").click();
         $(".button").click();
-        $(withText("Встреча успешно забронирована на")).shouldBe(visible, Duration.ofSeconds(15)).shouldHave(text(date));
+        $(".notification__content")
+            .shouldHave(Condition.text("Встреча успешно забронирована на " + date), Duration.ofSeconds(15))
+            .shouldBe(Condition.visible);
     }
 
     @Test
     void shouldInteractWithComplexElements() {
         Configuration.holdBrowserOpen = true;
+        int daysToAppointment = 7;
         $("[data-test-id=city] input").setValue("Че");
         $(withText("Челябинск")).click();
 
-        //Создаем строку с timestamp + 7 дней от текущего (полночь)
-        LocalDateTime today = LocalDateTime.now();
-        LocalDateTime sevenDaysLaterMidnight = today.with(LocalTime.MIN).plusDays(7);
-        Timestamp timestamp = Timestamp.valueOf(sevenDaysLaterMidnight);
+        $("[data-test-id=date] button").click();
+        long timestampMarkedDate = Long.parseLong($(".calendar__day_state_current").getAttribute("data-day"));
+        LocalDate markedDate = Instant.ofEpochMilli(timestampMarkedDate).atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate appointmentDate = LocalDate.now().plusDays(daysToAppointment);
+        if (markedDate.getMonth() != appointmentDate.getMonth()) {
+            $(".calendar__arrow_direction_right[data-step='1'][role=button]").click();
+        }
+
+        Timestamp timestamp = Timestamp.valueOf(appointmentDate.atStartOfDay());
         long timestampInMilliseconds = timestamp.getTime();
         String attributeValue = Long.toString(timestampInMilliseconds);
 
         $("[data-test-id=date] button").click();
-        $(".calendar__day[data-day='"+attributeValue+"']").click();
+        $(".calendar__day[data-day='" + attributeValue + "']").click();
         $("[data-test-id=name] input").setValue("Склодовская-Кюри Мария");
         $("[data-test-id=phone] input").setValue("+79220450812");
         $("[data-test-id=agreement]").click();
         $(".button").click();
 
-        Date currentDatePlusSevenDays = Date.from(sevenDaysLaterMidnight.atZone(ZoneId.systemDefault()).toInstant());
-        DateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy");
-        String date = dateFormat.format(currentDatePlusSevenDays);
-        $(withText("Встреча успешно забронирована на")).shouldBe(visible, Duration.ofSeconds(15)).shouldHave(text(date));
+        String date = generateDate(daysToAppointment);
+        $(".notification__content")
+            .shouldHave(Condition.text("Встреча успешно забронирована на " + date), Duration.ofSeconds(15))
+            .shouldBe(Condition.visible);
     }
 }
