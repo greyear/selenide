@@ -5,10 +5,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.Keys;
 
+import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Date;
 
@@ -46,6 +48,32 @@ public class CardDeliveryOrderTest {
         $("[data-test-id=phone] input").setValue("+79220450812");
         $("[data-test-id=agreement]").click();
         $(".button").click();
+        $(withText("Встреча успешно забронирована на")).shouldBe(visible, Duration.ofSeconds(15)).shouldHave(text(date));
+    }
+
+    @Test
+    void shouldInteractWithComplexElements() {
+        Configuration.holdBrowserOpen = true;
+        $("[data-test-id=city] input").setValue("Че");
+        $(withText("Челябинск")).click();
+
+        //Создаем строку с timestamp + 7 дней от текущего (полночь)
+        LocalDateTime today = LocalDateTime.now();
+        LocalDateTime sevenDaysLaterMidnight = today.with(LocalTime.MIN).plusDays(7);
+        Timestamp timestamp = Timestamp.valueOf(sevenDaysLaterMidnight);
+        long timestampInMilliseconds = timestamp.getTime();
+        String attributeValue = Long.toString(timestampInMilliseconds);
+
+        $("[data-test-id=date] button").click();
+        $(".calendar__day[data-day='"+attributeValue+"']").click();
+        $("[data-test-id=name] input").setValue("Склодовская-Кюри Мария");
+        $("[data-test-id=phone] input").setValue("+79220450812");
+        $("[data-test-id=agreement]").click();
+        $(".button").click();
+
+        Date currentDatePlusSevenDays = Date.from(sevenDaysLaterMidnight.atZone(ZoneId.systemDefault()).toInstant());
+        DateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy");
+        String date = dateFormat.format(currentDatePlusSevenDays);
         $(withText("Встреча успешно забронирована на")).shouldBe(visible, Duration.ofSeconds(15)).shouldHave(text(date));
     }
 }
